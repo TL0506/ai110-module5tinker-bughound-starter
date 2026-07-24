@@ -187,15 +187,22 @@ class BugHoundAgent:
 
         return None
 
+    _VALID_SEVERITIES = {"low": "Low", "medium": "Medium", "high": "High"}
+
     def _normalize_issues(self, arr: List[Any]) -> List[Dict[str, str]]:
         issues: List[Dict[str, str]] = []
         for item in arr:
             if not isinstance(item, dict):
                 continue
+            raw_severity = str(item.get("severity", "")).strip().lower()
+            # Unrecognized severity (typo, new label, etc.) defaults to High: risk_assessor
+            # only scores exact low/medium/high matches, so anything else must not
+            # silently score as zero risk.
+            severity = self._VALID_SEVERITIES.get(raw_severity, "High")
             issues.append(
                 {
                     "type": str(item.get("type", "Issue")),
-                    "severity": str(item.get("severity", "Unknown")),
+                    "severity": severity,
                     "msg": str(item.get("msg", "")).strip(),
                 }
             )

@@ -62,6 +62,15 @@ def assess_risk(
         score -= 5
         reasons.append("Bare except was modified, verify correctness.")
 
+    # A print-related issue was reported but the fix still contains print(...).
+    # Signals the LLM fixer addressed some issues but silently skipped this one.
+    print_issue_reported = any(
+        "print" in f"{issue.get('type', '')} {issue.get('msg', '')}".lower() for issue in issues
+    )
+    if print_issue_reported and "print(" in fixed_code:
+        score -= 15
+        reasons.append("A print-statement issue was reported but not resolved in the fix.")
+
     # ----------------------------
     # Clamp score
     # ----------------------------

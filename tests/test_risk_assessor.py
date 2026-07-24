@@ -46,3 +46,17 @@ def test_missing_return_is_penalized():
     )
     assert risk["score"] < 100
     assert any("Return" in r or "return" in r for r in risk["reasons"])
+
+
+def test_unresolved_print_issue_blocks_autofix():
+    # Guardrail: if a print-related issue was reported but the fixed code still
+    # contains print(...), the fixer silently skipped it and autofix must not proceed.
+    original = "def f():\n    print('hi')\n    return True\n"
+    fixed = "def f():\n    print('hi')\n    return True\n"
+    risk = assess_risk(
+        original_code=original,
+        fixed_code=fixed,
+        issues=[{"type": "Code Quality", "severity": "Medium", "msg": "print statement found, use logging"}],
+    )
+    assert any("print" in r.lower() for r in risk["reasons"])
+    assert risk["should_autofix"] is False

@@ -2,6 +2,15 @@ from bughound_agent import BugHoundAgent
 from llm_client import MockClient
 
 
+class SeverityTypoClient:
+    """Fake LLM client that returns a severity label outside Low/Medium/High."""
+
+    def complete(self, system_prompt, user_prompt):
+        if "Return ONLY valid JSON" in system_prompt:
+            return '[{"type": "Reliability", "severity": "critical", "msg": "test issue"}]'
+        return "def f():\n    pass\n"
+
+
 def test_workflow_runs_in_offline_mode_and_returns_shape():
     agent = BugHoundAgent(client=None)  # heuristic-only
     code = "def f():\n    print('hi')\n    return True\n"
@@ -47,3 +56,13 @@ def test_mock_client_forces_llm_fallback_to_heuristics_for_analysis():
     assert any(issue.get("type") == "Code Quality" for issue in result["issues"])
     # Ensure we logged the fallback path
     assert any("Falling back to heuristics" in entry.get("message", "") for entry in result["logs"])
+
+
+def test_analyze_normalizes_unknown_severity_to_high():
+    # Guardrail: risk_assessor only scores exact low/medium/high severities, so an
+    # unrecognized label from the LLM (e.g. a typo) must not silently score as zero risk.
+    agent = BugHoundAgent(client=SeverityTypoClient())
+    issues = agent.analyze("def f():\n    pass\n")
+
+    assert len(issues) == 1
+    assert issues[0]["severity"] == "High"
